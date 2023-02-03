@@ -1,0 +1,11 @@
+# Do not upload terraform 
+elasticbean/.terraform/
+elasticbean/.terraform*
+elasticbean/backend.tf
+elasticbean/terraform.*
+elasticbean/terraform.tfstate.*
+standard/.terraform/
+standard/.terraform*
+standard/backend.tf
+standard/terraform.tfstate
+standard/terraform.tfstate.backup

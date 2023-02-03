@@ -1,14 +1,19 @@
 # Terraform code to deploy an Elastic Beanstalk environment for running nodejs 14 applications
+There are two folders:
+```
+elasticbean/
+standard/
+```
+The first one provisions:a vpc, subnets and deploy the elastic beanstalk environment in load balancer mode by default (FINAL ARCHITECTURE).
 
-this code can create a vpc, subnets and deploy the elastic beanstalk in load balancer mode by default 
-using those resources created.
+The second provisions a: a vpc, subnets, load balancer, nat gateway, internet gateway, 2 load balanced instances a route 53 entry with a cerfiticate associated to it
 
 ## Prerequisites
 
 - Terraform installed on your system (> v0.12)
 - Awscli configured with credentials and access to aws account
 
-## Proceed with creation of a backend for your aws account
+## Proceed with creation of a backend for your aws account inside the elasticbean folder
 
 ```
 terraform {
@@ -81,3 +86,53 @@ No modules.
 |------|-------------|
 | <a name="output_dns_endpoint"></a> [dns\_endpoint](#output\_dns\_endpoint) | n/a |
 | <a name="output_elastic_beanstalk_environment_cname"></a> [elastic\_beanstalk\_environment\_cname](#output\_elastic\_beanstalk\_environment\_cname) | Environment cname |
+
+
+# This is the reference architecture
+![Timeoff Architecture Workflow](TimeoffArchitectureWorkflow.png)
+# To configure the continous delivery for the timeoff management application
+Go to the repository: https://github.com/jahescobar/timeoff-management-application
+There is the github action pipeline: https://github.com/jahescobar/timeoff-management-application/blob/master/.github/workflows/gorillatimeoffupdate.yaml
+
+```
+name: Gorillatimeoffupdate
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Create a ZIP deploy package
+        run: zip -r timeoff_deploy.zip ./
+
+      - name: Set AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SECRET_ACCESS_KEY }}
+          aws-region: "us-east-1"
+
+      - name: Load deployment package to S3
+        run: aws s3 cp timeoff_deploy.zip s3://timeoff-jahescobar/
+
+      - name: Create a new timeoff-app Version
+        run: |
+          aws elasticbeanstalk create-application-version \
+          --application-name timeoff-app \
+          --source-bundle S3Bucket="timeoff-jahescobar",S3Key="timeoff_deploy.zip" \
+          --version-label "timeoffapp-${{ github.sha }}" \
+          --description "commit-sha-${{ github.sha }}"
+      - name: Deploy new timeoff-app version
+        run: aws elasticbeanstalk update-environment --environment-name timeoff-env --version-label "timeoffapp-${{ github.sha }}"
+```
+
+Which permits deploying the application from there to the infrastructure previously created with the code from this repository.
+
+In order to adapt to your own environment, you need to setup the aws credentials in the secret setup of the github workflow, as well as modify it according to your application and S3 bucket setups. 
+
